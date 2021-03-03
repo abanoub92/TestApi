@@ -1,5 +1,6 @@
 const mysql = require('mysql');
-const { use } = require('../routes');
+const jwt = require('jsonwebtoken');
+//const { use } = require('../routes');
 
 const pool = mysql.createPool({
     connectionLimit: 10,
@@ -119,5 +120,60 @@ blogdb.post = (user) => {
     });
 
 };
+
+
+/**
+ * GET users by search letters
+ */
+blogdb.search = (name) => {
+    return new Promise((resolve, reject) => {
+        var sql = "SET @username = ?; CALL userSearch(@username);";
+
+        pool.query(sql, [`${name}%`], (err, results) => {
+            if (err){
+                return reject(err);
+            }
+
+            return resolve(results[1]);
+        });
+    });
+
+};
+
+/**
+ * GET user if username and password are correct and valid
+ */
+blogdb.login = (user) => {
+    return new Promise((resolve, reject) => {
+        var sql = "SET @username =?;SET @password = ?; CALL userLogin(@username, @password);";
+
+        pool.query(sql, [user.username, user.password], (err, results) => {
+        
+            if (err){
+                return reject(err);
+            }
+
+            const success = {};
+            success.user = results[2][0];
+
+            if (success.user != null){
+                jwt.sign({user: user}, 'secretkey', (err, token) => {
+                    if (err){
+                        return reject(err);
+                    }
+    
+                    success.token = token;
+                });
+
+                return resolve(success);
+            }else {
+                success.status = 404;
+                success.message = 'Username / Password not found or registered.';
+
+                return resolve(success);
+            }
+        });
+    });
+}
 
 module.exports = blogdb;
